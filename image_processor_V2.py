@@ -1,4 +1,5 @@
 import os
+import re
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from PIL import Image
@@ -12,6 +13,7 @@ import threading
 import logging
 import tempfile
 from PyPDF2 import PdfMerger
+from natsort import natsorted
 
 CANVAS_SIZES = {
     'CSAT (272 x 394 mm)': (272, 394),
@@ -52,7 +54,8 @@ def create_pdf(image_data_list, canvas_option, pdf_progress_var, status_label):
         raise
 
 def process_images(input_folder, canvas_option, convert_progress_var, pdf_progress_var, compress_progress_var, status_label):
-    image_files = [f for f in os.listdir(input_folder) if f.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS)]
+    # 이미지 파일 경로를 정렬하여 불러오기
+    image_files = natsorted([f for f in os.listdir(input_folder) if f.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS)])
     total_images = len(image_files)
     
     if total_images == 0:
@@ -98,7 +101,7 @@ def create_pdf_page(img_data, page_index, canvas_option):
         if canvas_option == 'A4 (210 x 297 mm)':
             a4_aspect_ratio = page_height_mm / page_width_mm
 
-        temp_pdf_path = os.path.join(tempfile.gettempdir(), f"temp_page_{page_index}.pdf")
+        temp_pdf_path = os.path.join(tempfile.gettempdir(), f"temp_page_{page_index:04d}.pdf")
         c = canvas.Canvas(temp_pdf_path, pagesize=(page_width_mm * mm, page_height_mm * mm))
 
         img = Image.open(io.BytesIO(img_data))
@@ -130,8 +133,15 @@ def create_pdf_page(img_data, page_index, canvas_option):
 
 def combine_pdfs(pdf_paths, output_path):
     try:
+        pdf_paths = natsorted(pdf_paths, key=lambda x: os.path.basename(x))
+        
+        # 정렬된 파일 경로 출력
+        print("정렬된 파일 경로:")
+        for path in pdf_paths:
+            print(path)
+
         merger = PdfMerger()
-        for pdf_path in sorted(pdf_paths, key=lambda x: int(os.path.splitext(os.path.basename(x))[0].split('_')[-1])):
+        for pdf_path in pdf_paths:
             merger.append(pdf_path)
         merger.write(output_path)
         merger.close()
